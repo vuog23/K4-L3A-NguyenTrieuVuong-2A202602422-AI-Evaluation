@@ -254,12 +254,20 @@ class OpenAIGenerator:
         self.max_output_tokens = max_output_tokens
 
     def generate(self, prompt: str) -> str:
-        response = self.client.responses.create(
-            model=self.model,
-            input=prompt,
-            temperature=0,
-            max_output_tokens=self.max_output_tokens,
-        )
+        request: dict[str, Any] = {
+            "model": self.model,
+            "input": prompt,
+            "max_output_tokens": max(600, self.max_output_tokens)
+            if self.model.lower().startswith("gpt-5")
+            else self.max_output_tokens,
+        }
+        # GPT-5 models reject the temperature parameter; other configured
+        # models retain the starter's deterministic setting.
+        if self.model.lower().startswith("gpt-5"):
+            request["reasoning"] = {"effort": "minimal"}
+        else:
+            request["temperature"] = 0
+        response = self.client.responses.create(**request)
         answer = response.output_text.strip()
         if not answer:
             raise RuntimeError("OpenAI returned an empty answer")
